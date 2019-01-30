@@ -103,13 +103,14 @@ static void init_mmap()
     exit(EXIT_FAILURE);
   }
 
-  struct v4l2_buffer buf;
-  CLEAR(buf);
-  buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  buf.memory = V4L2_MEMORY_MMAP;
-  buf.index = n_buffers;
   for (n_buffers = 0; n_buffers < req.count; n_buffers++)
   {
+    struct v4l2_buffer buf;
+    CLEAR(buf);
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buf.memory = V4L2_MEMORY_MMAP;
+    buf.index = n_buffers;
+
     if (-1 == xioctl(fd, VIDIOC_QUERYBUF, &buf))
       errno_exit("VIDIOC_QUERYBUF");
 
@@ -148,8 +149,7 @@ static void open_device()
     exit(EXIT_FAILURE);
   }
 
-  fd = open(dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);
-
+  fd = open(dev_name, O_RDWR | O_NONBLOCK, 0);
   if (-1 == fd)
   {
     fprintf(
@@ -205,7 +205,7 @@ static void init_device()
   {
     struct v4l2_crop crop;
     crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    crop.c = cropcap.defrect; /* reset to default */
+    crop.c = cropcap.defrect; // reset to default
 
     if (-1 == xioctl(fd, VIDIOC_S_CROP, &crop))
     {
@@ -233,13 +233,24 @@ static void init_device()
   if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
     errno_exit("VIDIOC_S_FMT");
 
+  struct v4l2_streamparm stream_params;
+  CLEAR(stream_params);
+  stream_params.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  if (-1 == xioctl(fd, VIDIOC_G_PARM, &stream_params))
+    errno_exit("VIDIOC_G_PARM");
+
+  stream_params.parm.capture.timeperframe.numerator = 1;
+  stream_params.parm.capture.timeperframe.denominator = 30;
+  if (-1 == xioctl(fd, VIDIOC_S_PARM, &stream_params))
+    errno_exit("VIDIOC_S_PARM");
+
   // "buggy driver paranoia"
-  size_t min = fmt.fmt.pix.width * 2;
-  if (fmt.fmt.pix.bytesperline < min)
-    fmt.fmt.pix.bytesperline = min;
-  min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
-  if (fmt.fmt.pix.sizeimage < min)
-    fmt.fmt.pix.sizeimage = min;
+  // size_t min = fmt.fmt.pix.width * 2;
+  // if (fmt.fmt.pix.bytesperline < min)
+  //   fmt.fmt.pix.bytesperline = min;
+  // min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  // if (fmt.fmt.pix.sizeimage < min)
+  //   fmt.fmt.pix.sizeimage = min;
 
   init_mmap();
 }
