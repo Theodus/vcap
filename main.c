@@ -14,6 +14,7 @@ TODO:
 #include <fcntl.h> /* low-level i/o */
 #include <getopt.h>
 #include <linux/videodev2.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +36,7 @@ struct buffer
 static char* dev_name;
 static int fd = -1;
 struct buffer* buffers;
-static unsigned int n_buffers;
+static size_t n_buffers;
 static int out_buf;
 static int frame_count = 70;
 
@@ -48,7 +49,6 @@ static void errno_exit(const char* s)
 static int xioctl(int fh, int request, void* arg)
 {
   int r;
-
   do
   {
     r = ioctl(fh, request, arg);
@@ -67,11 +67,10 @@ static void process_image(const void* p, int size)
   fflush(stdout);
 }
 
-static int read_frame(void)
+static int read_frame()
 {
   struct v4l2_buffer buf;
   CLEAR(buf);
-
   buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   buf.memory = V4L2_MEMORY_MMAP;
 
@@ -82,11 +81,7 @@ static int read_frame(void)
       case EAGAIN:
         return 0;
 
-      case EIO:
-        /* Could ignore EIO, see spec. */
-
-        /* fall through */
-
+      case EIO: // Could ignore EIO, see spec.
       default:
         errno_exit("VIDIOC_DQBUF");
     }
@@ -102,29 +97,20 @@ static int read_frame(void)
   return 1;
 }
 
-static void mainloop(void)
+static void mainloop()
 {
-  unsigned int count;
-
-  count = frame_count;
-
+  size_t count = frame_count;
   while (count-- > 0)
   {
-    for (;;)
+    while (true)
     {
       fd_set fds;
-      struct timeval tv;
-      int r;
-
       FD_ZERO(&fds);
       FD_SET(fd, &fds);
 
-      /* Timeout. */
-      tv.tv_sec = 2;
-      tv.tv_usec = 0;
-
-      r = select(fd + 1, &fds, NULL, NULL, &tv);
-
+      struct timeval tv =
+        (struct timeval){.tv_sec = 2, .tv_usec = 0}; // timeout
+      int r = select(fd + 1, &fds, NULL, NULL, &tv);
       if (-1 == r)
       {
         if (EINTR == errno)
@@ -140,12 +126,13 @@ static void mainloop(void)
 
       if (read_frame())
         break;
-      /* EAGAIN - continue select loop. */
+
+      // EAGAIN - continue select loop.
     }
   }
 }
 
-static void stop_capturing(void)
+static void stop_capturing()
 {
   enum v4l2_buf_type type;
 
@@ -154,40 +141,36 @@ static void stop_capturing(void)
     errno_exit("VIDIOC_STREAMOFF");
 }
 
-static void start_capturing(void)
+static void start_capturing()
 {
-  unsigned int i;
-  enum v4l2_buf_type type;
+  enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-  for (i = 0; i < n_buffers; ++i)
+  for (size_t i = 0; i < n_buffers; i++)
   {
     struct v4l2_buffer buf;
-
     CLEAR(buf);
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buf.type = type;
     buf.memory = V4L2_MEMORY_MMAP;
     buf.index = i;
 
     if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
       errno_exit("VIDIOC_QBUF");
   }
-  type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
   if (-1 == xioctl(fd, VIDIOC_STREAMON, &type))
     errno_exit("VIDIOC_STREAMON");
 }
 
-static void uninit_device(void)
+static void uninit_device()
 {
-  unsigned int i;
-
-  for (i = 0; i < n_buffers; ++i)
+  for (size_t i = 0; i < n_buffers; i++)
     if (-1 == munmap(buffers[i].start, buffers[i].length))
       errno_exit("munmap");
 
   free(buffers);
 }
 
-static void init_mmap(void)
+static void init_mmap()
 {
   struct v4l2_requestbuffers req;
 
@@ -228,12 +211,10 @@ static void init_mmap(void)
     exit(EXIT_FAILURE);
   }
 
-  for (n_buffers = 0; n_buffers < req.count; ++n_buffers)
+  for (n_buffers = 0; n_buffers < req.count; n_buffers++)
   {
     struct v4l2_buffer buf;
-
     CLEAR(buf);
-
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
     buf.index = n_buffers;
@@ -255,13 +236,9 @@ static void init_mmap(void)
   }
 }
 
-static void init_device(void)
+static void init_device()
 {
   struct v4l2_capability cap;
-  struct v4l2_cropcap cropcap;
-  struct v4l2_crop crop;
-  struct v4l2_format fmt;
-  unsigned int min;
 
   if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &cap))
   {
@@ -288,14 +265,15 @@ static void init_device(void)
     exit(EXIT_FAILURE);
   }
 
-  /* Select video input, video standard and tune here. */
+  // select video input, video standard and tune
 
+  struct v4l2_cropcap cropcap;
   CLEAR(cropcap);
-
   cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
   if (0 == xioctl(fd, VIDIOC_CROPCAP, &cropcap))
   {
+    struct v4l2_crop crop;
     crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     crop.c = cropcap.defrect; /* reset to default */
 
@@ -303,34 +281,30 @@ static void init_device(void)
     {
       switch (errno)
       {
-        case EINVAL:
-          /* Cropping not supported. */
-          break;
-        default:
-          /* Errors ignored. */
+        case EINVAL: // Cropping not supported.min
+        default: // Errors ignored.
           break;
       }
     }
   }
   else
   {
-    /* Errors ignored. */
+    // TODO: Errors ignored.
   }
 
+  struct v4l2_format fmt;
   CLEAR(fmt);
-
   fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
   fmt.fmt.pix.width = 1280;
   fmt.fmt.pix.height = 720;
   fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV; // TODO: RGB camera source ?
-  // fmt.fmt.pix.field = V4L2_FIELD_INTERLACED; // TODO: ?
+  fmt.fmt.pix.field = V4L2_FIELD_INTERLACED; // TODO: ?
 
   if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
-    errno_exit("VIDIOC_G_FMT");
+    errno_exit("VIDIOC_S_FMT");
 
-  /* Buggy driver paranoia. */
-  min = fmt.fmt.pix.width * 2;
+  // "buggy driver paranoia"
+  size_t min = fmt.fmt.pix.width * 2;
   if (fmt.fmt.pix.bytesperline < min)
     fmt.fmt.pix.bytesperline = min;
   min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
@@ -340,7 +314,7 @@ static void init_device(void)
   init_mmap();
 }
 
-static void close_device(void)
+static void close_device()
 {
   if (-1 == close(fd))
     errno_exit("close");
@@ -348,7 +322,7 @@ static void close_device(void)
   fd = -1;
 }
 
-static void open_device(void)
+static void open_device()
 {
   struct stat st;
 
@@ -389,8 +363,6 @@ static void usage(FILE* fp, char const* arg0)
     "-d | --device name   Video device name [%s]\n"
     "-h | --help          Print this message\n"
     "-m | --mmap          Use memory mapped buffers [default]\n"
-    "-r | --read          Use read() calls\n"
-    "-u | --userp         Use application allocated buffers\n"
     "-o | --output        Outputs stream to stdout\n"
     "-c | --count         Number of frames to grab [%i]\n"
     "\n",
@@ -412,7 +384,7 @@ int main(int argc, char** argv)
 {
   dev_name = "/dev/video0";
 
-  for (;;)
+  while (true)
   {
     int idx;
     int c;
