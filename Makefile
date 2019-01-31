@@ -4,7 +4,7 @@ TARGET = vcap
 INPUT_DEVICE ?= /dev/video0
 RESOLUTION ?= 1280x720
 
-.PHONY : all clean perf play
+.PHONY : all clean out perf play
 
 all : $(TARGET)
 
@@ -15,10 +15,10 @@ $(TARGET) : main.c
 	-$(CC) $(CFLAGS) -o $(TARGET) main.c
 
 out : $(TARGET)
-	./vcap -d $(INPUT_DEVICE) -c 60 -r $(RESOLUTION) -o > out
+	time ./vcap -d $(INPUT_DEVICE) -c 60 -r $(RESOLUTION) -o > out
 
 perf : $(TARGET)
 	perf record -g ./vcap -d $(INPUT_DEVICE) -c 240
 
 play : out
-	ffplay -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate 30 -i out
+	ffplay -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate 10 -i out

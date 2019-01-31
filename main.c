@@ -1,14 +1,3 @@
-
-// V4L2 Video capture to hardware driver
-
-/*
-TODO:
-  - Cofiguration options:
-    - resolution
-  - Interact with driver
-
-*/
-
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h> /* low-level i/o */
@@ -26,6 +15,16 @@ TODO:
 #include <unistd.h>
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
+
+// V4L2 Video capture to hardware driver
+
+/*
+- check `v4l2-ctl --list-formats-ext`, for camera details
+
+TODO:
+  - Framerate option (currently 10 fps)
+  - Interact with driver
+*/
 
 struct buffer
 {
@@ -66,9 +65,11 @@ static int xioctl(int fh, int request, void* arg)
 
 static void init_mmap()
 {
+  size_t const buf_count = 32;
+
   struct v4l2_requestbuffers req;
   CLEAR(req);
-  req.count = 4;
+  req.count = buf_count;
   req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   req.memory = V4L2_MEMORY_MMAP;
 
@@ -89,7 +90,7 @@ static void init_mmap()
     }
   }
 
-  if (req.count < 2)
+  if (req.count < buf_count)
   {
     fprintf(stderr, "Insufficient buffer memory on %s\n", dev_name);
     exit(EXIT_FAILURE);
@@ -227,8 +228,8 @@ static void init_device()
   fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   fmt.fmt.pix.width = resolution.x;
   fmt.fmt.pix.height = resolution.y;
-  fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV; // TODO: RGB camera source ?
-  fmt.fmt.pix.field = V4L2_FIELD_INTERLACED; // TODO: ?
+  fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+  fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
   if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
     errno_exit("VIDIOC_S_FMT");
@@ -240,7 +241,7 @@ static void init_device()
     errno_exit("VIDIOC_G_PARM");
 
   stream_params.parm.capture.timeperframe.numerator = 1;
-  stream_params.parm.capture.timeperframe.denominator = 30;
+  stream_params.parm.capture.timeperframe.denominator = 10;
   if (-1 == xioctl(fd, VIDIOC_S_PARM, &stream_params))
     errno_exit("VIDIOC_S_PARM");
 
@@ -405,11 +406,8 @@ int main(int argc, char** argv)
   while (true)
   {
     int idx;
-    int c;
-
-    c = getopt_long(argc, argv, short_options, long_options, &idx);
-
-    if (-1 == c)
+    int c = getopt_long(argc, argv, short_options, long_options, &idx);
+    if (c == -1)
       break;
 
     switch (c)
