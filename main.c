@@ -14,8 +14,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define CLEAR(x) memset(&(x), 0, sizeof(x))
-
 // V4L2 Video capture to hardware driver
 
 /*
@@ -79,11 +77,11 @@ static void init_mmap()
 {
   size_t const buf_count = 32;
 
-  struct v4l2_requestbuffers req;
-  CLEAR(req);
-  req.count = buf_count;
-  req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  req.memory = V4L2_MEMORY_MMAP;
+  struct v4l2_requestbuffers req = {
+    .count = buf_count,
+    .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+    .memory = V4L2_MEMORY_MMAP,
+  };
 
   if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req))
   {
@@ -103,23 +101,18 @@ static void init_mmap()
 
   for (n_buffers = 0; n_buffers < req.count; n_buffers++)
   {
-    struct v4l2_buffer buf;
-    CLEAR(buf);
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.index = n_buffers;
+    struct v4l2_buffer buf = {
+      .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+      .memory = V4L2_MEMORY_MMAP,
+      .index = n_buffers,
+    };
 
     if (-1 == xioctl(fd, VIDIOC_QUERYBUF, &buf))
       errno_err("VIDIOC_QUERYBUF");
 
     buffers[n_buffers].length = buf.length;
     buffers[n_buffers].start = mmap(
-      NULL /* start anywhere */,
-      buf.length,
-      PROT_READ | PROT_WRITE /* required */,
-      MAP_SHARED /* recommended */,
-      fd,
-      buf.m.offset);
+      NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
 
     if (MAP_FAILED == buffers[n_buffers].start)
       errno_err("mmap");
@@ -129,7 +122,6 @@ static void init_mmap()
 static void open_device()
 {
   struct stat st;
-
   if (-1 == stat(dev_name, &st))
     errno_err(dev_name);
 
@@ -152,7 +144,6 @@ static void close_device()
 static void init_device()
 {
   struct v4l2_capability cap;
-
   if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &cap))
   {
     if (EINVAL == errno)
@@ -169,16 +160,15 @@ static void init_device()
 
   // select video input, video standard and tune
 
-  struct v4l2_cropcap cropcap;
-  CLEAR(cropcap);
-  cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
+  struct v4l2_cropcap cropcap = {
+    .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+  };
   if (0 == xioctl(fd, VIDIOC_CROPCAP, &cropcap))
   {
-    struct v4l2_crop crop;
-    crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    crop.c = cropcap.defrect; // reset to default
-
+    struct v4l2_crop crop = {
+      .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+      .c = cropcap.defrect, // reset to default
+    };
     if (-1 == xioctl(fd, VIDIOC_S_CROP, &crop))
     {
       switch (errno)
@@ -194,23 +184,21 @@ static void init_device()
     // TODO: Errors ignored.
   }
 
-  struct v4l2_format fmt;
-  CLEAR(fmt);
-  fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  fmt.fmt.pix.width = resolution.x;
-  fmt.fmt.pix.height = resolution.y;
-  fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-  fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
-
+  struct v4l2_format fmt = {
+    .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+    .fmt.pix.width = resolution.x,
+    .fmt.pix.height = resolution.y,
+    .fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV,
+    .fmt.pix.field = V4L2_FIELD_INTERLACED,
+  };
   if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
     errno_err("VIDIOC_S_FMT");
 
-  struct v4l2_streamparm stream_params;
-  CLEAR(stream_params);
-  stream_params.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  struct v4l2_streamparm stream_params = {
+    .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+  };
   if (-1 == xioctl(fd, VIDIOC_G_PARM, &stream_params))
     errno_err("VIDIOC_G_PARM");
-
   stream_params.parm.capture.timeperframe.numerator = 1;
   stream_params.parm.capture.timeperframe.denominator = 10;
   if (-1 == xioctl(fd, VIDIOC_S_PARM, &stream_params))
@@ -242,12 +230,11 @@ static void start_capturing()
 
   for (size_t i = 0; i < n_buffers; i++)
   {
-    struct v4l2_buffer buf;
-    CLEAR(buf);
-    buf.type = type;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.index = i;
-
+    struct v4l2_buffer buf = {
+      .type = type,
+      .memory = V4L2_MEMORY_MMAP,
+      .index = i,
+    };
     if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
       errno_err("VIDIOC_QBUF");
   }
@@ -258,9 +245,7 @@ static void start_capturing()
 
 static void stop_capturing()
 {
-  enum v4l2_buf_type type;
-
-  type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   if (-1 == xioctl(fd, VIDIOC_STREAMOFF, &type))
     errno_err("VIDIOC_STREAMOFF");
 }
@@ -275,19 +260,18 @@ static void process_image(const void* p, int size)
   fflush(stdout);
 }
 
-static int read_frame()
+static bool read_frame()
 {
-  struct v4l2_buffer buf;
-  CLEAR(buf);
-  buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  buf.memory = V4L2_MEMORY_MMAP;
-
+  struct v4l2_buffer buf = {
+    .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+    .memory = V4L2_MEMORY_MMAP,
+  };
   if (-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
   {
     switch (errno)
     {
       case EAGAIN:
-        return 0;
+        return false;
 
       case EIO: // Could ignore EIO, see spec.
       default:
@@ -302,7 +286,7 @@ static int read_frame()
   if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
     errno_err("VIDIOC_QBUF");
 
-  return 1;
+  return true;
 }
 
 static void mainloop()
