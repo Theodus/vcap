@@ -3,6 +3,7 @@ CFLAGS = -O3 -g -std=gnu11 -Wall -Wextra -Wpedantic
 TARGET = vcap
 INPUT_DEVICE ?= /dev/video2
 RESOLUTION ?= 1280x720
+FRAMERATE ?= 10
 
 .PHONY : all clean out perf play
 
@@ -15,7 +16,7 @@ $(TARGET) : main.c
 	-$(CC) $(CFLAGS) -o $(TARGET) main.c
 
 out : $(TARGET)
-	./vcap -d $(INPUT_DEVICE) -c 20 -r $(RESOLUTION) -o > out
+	./vcap -d $(INPUT_DEVICE) -c 20 -r $(RESOLUTION) -f $(FRAMERATE) -o > out
 
 perf : $(TARGET)
 	perf record -g ./vcap -d $(INPUT_DEVICE) -c 240

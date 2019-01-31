@@ -18,7 +18,6 @@
 - check `v4l2-ctl --list-formats-ext`, for camera details
 
 TODO:
-  - Framerate option (currently 10 fps)
   - Interact with driver
 */
 
@@ -41,6 +40,7 @@ static size_t n_buffers;
 static int out_buf;
 static int frame_count = 70;
 static resolution_t resolution = {1280, 720};
+static size_t frame_rate = 10;
 
 static void errno_err(const char* s)
 {
@@ -198,7 +198,7 @@ static void init_device()
   if (-1 == xioctl(fd, VIDIOC_G_PARM, &stream_params))
     errno_err("VIDIOC_G_PARM");
   stream_params.parm.capture.timeperframe.numerator = 1;
-  stream_params.parm.capture.timeperframe.denominator = 10;
+  stream_params.parm.capture.timeperframe.denominator = frame_rate;
   if (-1 == xioctl(fd, VIDIOC_S_PARM, &stream_params))
     errno_err("VIDIOC_S_PARM");
 
@@ -333,6 +333,7 @@ static void usage(FILE* fp, char const* arg0)
     "-o | --output        Outputs stream to stdout\n"
     "-c | --count         Number of frames to grab [%i]\n"
     "-r | --resolution    Resulution [%zux%zu]\n"
+    "-f | --framerate     Frame rate\n"
     "\n",
     arg0,
     dev_name,
@@ -341,7 +342,7 @@ static void usage(FILE* fp, char const* arg0)
     resolution.y);
 }
 
-static char const* short_options = "d:hoc:r:";
+static char const* short_options = "d:hoc:r:f:";
 
 static const struct option long_options[] = {
   {"device", required_argument, NULL, 'd'},
@@ -349,6 +350,7 @@ static const struct option long_options[] = {
   {"output", no_argument, NULL, 'o'},
   {"count", required_argument, NULL, 'c'},
   {"resolution", required_argument, NULL, 'r'},
+  {"framerate", required_argument, NULL, 'f'},
   {0, 0, 0, 0}};
 
 int main(int argc, char** argv)
@@ -388,6 +390,13 @@ int main(int argc, char** argv)
 
       case 'r':
         sscanf(optarg, "%zux%zu", &resolution.x, &resolution.y);
+        break;
+
+      case 'f':
+        errno = 0;
+        frame_rate = strtol(optarg, NULL, 0);
+        if (errno)
+          errno_err(optarg);
         break;
 
       default:
