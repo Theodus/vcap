@@ -46,9 +46,21 @@ static int out_buf;
 static int frame_count = 70;
 static resolution_t resolution = (resolution_t){1280, 720};
 
-static void errno_exit(const char* s)
+static void errno_err(const char* s)
 {
   fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
+  exit(EXIT_FAILURE);
+}
+
+static void fatal_err(const char* s)
+{
+  fprintf(stderr, "%s\n", s);
+  exit(EXIT_FAILURE);
+}
+
+static void device_err(const char* s)
+{
+  fprintf(stderr, dev_name, "%s %s\n", s);
   exit(EXIT_FAILURE);
 }
 
@@ -76,33 +88,18 @@ static void init_mmap()
   if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req))
   {
     if (EINVAL == errno)
-    {
-      fprintf(
-        stderr,
-        "%s does not support "
-        "memory mappingn",
-        dev_name);
-      exit(EXIT_FAILURE);
-    }
+      device_err("does not support memory mapping");
     else
-    {
-      errno_exit("VIDIOC_REQBUFS");
-    }
+      errno_err("VIDIOC_REQBUFS");
   }
 
   if (req.count < buf_count)
-  {
-    fprintf(stderr, "Insufficient buffer memory on %s\n", dev_name);
-    exit(EXIT_FAILURE);
-  }
+    device_err("has insufficient buffer memory");
 
   buffers = calloc(req.count, sizeof(*buffers));
 
   if (!buffers)
-  {
-    fprintf(stderr, "Out of memory\n");
-    exit(EXIT_FAILURE);
-  }
+    fatal_err("out of memory");
 
   for (n_buffers = 0; n_buffers < req.count; n_buffers++)
   {
@@ -113,7 +110,7 @@ static void init_mmap()
     buf.index = n_buffers;
 
     if (-1 == xioctl(fd, VIDIOC_QUERYBUF, &buf))
-      errno_exit("VIDIOC_QUERYBUF");
+      errno_err("VIDIOC_QUERYBUF");
 
     buffers[n_buffers].length = buf.length;
     buffers[n_buffers].start = mmap(
@@ -125,7 +122,7 @@ static void init_mmap()
       buf.m.offset);
 
     if (MAP_FAILED == buffers[n_buffers].start)
-      errno_exit("mmap");
+      errno_err("mmap");
   }
 }
 
@@ -134,35 +131,20 @@ static void open_device()
   struct stat st;
 
   if (-1 == stat(dev_name, &st))
-  {
-    fprintf(
-      stderr,
-      "Cannot identify '%s': %d, %s\n",
-      dev_name,
-      errno,
-      strerror(errno));
-    exit(EXIT_FAILURE);
-  }
+    errno_err(dev_name);
 
   if (!S_ISCHR(st.st_mode))
-  {
-    fprintf(stderr, "%s is no devicen", dev_name);
-    exit(EXIT_FAILURE);
-  }
+    device_err("is not a char device");
 
   fd = open(dev_name, O_RDWR | O_NONBLOCK, 0);
   if (-1 == fd)
-  {
-    fprintf(
-      stderr, "Cannot open '%s': %d, %s\n", dev_name, errno, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
+    errno_err("cannot open device");
 }
 
 static void close_device()
 {
   if (-1 == close(fd))
-    errno_exit("close");
+    errno_err("close");
 
   fd = -1;
 }
@@ -174,27 +156,16 @@ static void init_device()
   if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &cap))
   {
     if (EINVAL == errno)
-    {
-      fprintf(stderr, "%s is no V4L2 device\n", dev_name);
-      exit(EXIT_FAILURE);
-    }
+      device_err("is not a V4L2 device");
     else
-    {
-      errno_exit("VIDIOC_QUERYCAP");
-    }
+      errno_err("VIDIOC_QUERYCAP");
   }
 
   if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE))
-  {
-    fprintf(stderr, "%s is no video capture device\n", dev_name);
-    exit(EXIT_FAILURE);
-  }
+    device_err("is not a video capture device");
 
   if (!(cap.capabilities & V4L2_CAP_STREAMING))
-  {
-    fprintf(stderr, "%s does not support streaming i/o\n", dev_name);
-    exit(EXIT_FAILURE);
-  }
+    device_err("is not a video streaming device");
 
   // select video input, video standard and tune
 
@@ -212,7 +183,7 @@ static void init_device()
     {
       switch (errno)
       {
-        case EINVAL: // Cropping not supported.min
+        case EINVAL: // Cropping not supported
         default: // Errors ignored.
           break;
       }
@@ -232,18 +203,18 @@ static void init_device()
   fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
   if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
-    errno_exit("VIDIOC_S_FMT");
+    errno_err("VIDIOC_S_FMT");
 
   struct v4l2_streamparm stream_params;
   CLEAR(stream_params);
   stream_params.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   if (-1 == xioctl(fd, VIDIOC_G_PARM, &stream_params))
-    errno_exit("VIDIOC_G_PARM");
+    errno_err("VIDIOC_G_PARM");
 
   stream_params.parm.capture.timeperframe.numerator = 1;
   stream_params.parm.capture.timeperframe.denominator = 10;
   if (-1 == xioctl(fd, VIDIOC_S_PARM, &stream_params))
-    errno_exit("VIDIOC_S_PARM");
+    errno_err("VIDIOC_S_PARM");
 
   // "buggy driver paranoia"
   // size_t min = fmt.fmt.pix.width * 2;
@@ -260,7 +231,7 @@ static void uninit_device()
 {
   for (size_t i = 0; i < n_buffers; i++)
     if (-1 == munmap(buffers[i].start, buffers[i].length))
-      errno_exit("munmap");
+      errno_err("munmap");
 
   free(buffers);
 }
@@ -278,11 +249,11 @@ static void start_capturing()
     buf.index = i;
 
     if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
-      errno_exit("VIDIOC_QBUF");
+      errno_err("VIDIOC_QBUF");
   }
 
   if (-1 == xioctl(fd, VIDIOC_STREAMON, &type))
-    errno_exit("VIDIOC_STREAMON");
+    errno_err("VIDIOC_STREAMON");
 }
 
 static void stop_capturing()
@@ -291,7 +262,7 @@ static void stop_capturing()
 
   type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   if (-1 == xioctl(fd, VIDIOC_STREAMOFF, &type))
-    errno_exit("VIDIOC_STREAMOFF");
+    errno_err("VIDIOC_STREAMOFF");
 }
 
 static void process_image(const void* p, int size)
@@ -320,7 +291,7 @@ static int read_frame()
 
       case EIO: // Could ignore EIO, see spec.
       default:
-        errno_exit("VIDIOC_DQBUF");
+        errno_err("VIDIOC_DQBUF");
     }
   }
 
@@ -329,7 +300,7 @@ static int read_frame()
   process_image(buffers[buf.index].start, buf.bytesused);
 
   if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
-    errno_exit("VIDIOC_QBUF");
+    errno_err("VIDIOC_QBUF");
 
   return 1;
 }
@@ -352,14 +323,12 @@ static void mainloop()
       {
         if (EINTR == errno)
           continue;
-        errno_exit("select");
+
+        errno_err("select");
       }
 
       if (0 == r)
-      {
-        fprintf(stderr, "select timeout\n");
-        exit(EXIT_FAILURE);
-      }
+        fatal_err("select timeout");
 
       if (read_frame())
         break;
@@ -431,7 +400,7 @@ int main(int argc, char** argv)
         errno = 0;
         frame_count = strtol(optarg, NULL, 0);
         if (errno)
-          errno_exit(optarg);
+          errno_err(optarg);
         break;
 
       case 'r':
