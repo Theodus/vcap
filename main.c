@@ -19,6 +19,9 @@
 
 TODO:
   - Interact with driver
+  - Video Framebuffer API, ScatterGather
+  - Buffer to HDMI out through board
+  - 720x640
 */
 
 typedef struct
