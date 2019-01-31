@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h> /* low-level i/o */
+#include <fcntl.h> // low-level i/o
 #include <getopt.h>
 #include <linux/videodev2.h>
 #include <stdbool.h>
@@ -10,8 +10,6 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 // V4L2 Video capture to hardware driver
@@ -42,7 +40,7 @@ struct buffer* buffers;
 static size_t n_buffers;
 static int out_buf;
 static int frame_count = 70;
-static resolution_t resolution = (resolution_t){1280, 720};
+static resolution_t resolution = {1280, 720};
 
 static void errno_err(const char* s)
 {
@@ -218,8 +216,10 @@ static void init_device()
 static void uninit_device()
 {
   for (size_t i = 0; i < n_buffers; i++)
+  {
     if (-1 == munmap(buffers[i].start, buffers[i].length))
       errno_err("munmap");
+  }
 
   free(buffers);
 }
@@ -300,8 +300,7 @@ static void mainloop()
       FD_ZERO(&fds);
       FD_SET(fd, &fds);
 
-      struct timeval tv =
-        (struct timeval){.tv_sec = 2, .tv_usec = 0}; // timeout
+      struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
       int r = select(fd + 1, &fds, NULL, NULL, &tv);
       if (-1 == r)
       {
@@ -365,7 +364,7 @@ int main(int argc, char** argv)
 
     switch (c)
     {
-      case 0: /* getopt_long() flag */
+      case 0: // getopt_long() flag
         break;
 
       case 'd':
