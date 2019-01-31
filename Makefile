@@ -16,10 +16,10 @@ $(TARGET) : main.c
 	-$(CC) $(CFLAGS) -o $(TARGET) main.c
 
 out : $(TARGET)
-	./vcap -d $(INPUT_DEVICE) -c 20 -r $(RESOLUTION) -f $(FRAMERATE) -o > out
+	./vcap -d $(INPUT_DEVICE) -c 30 -r $(RESOLUTION) -f $(FRAMERATE) -o > out
 
 perf : $(TARGET)
 	perf record -g ./vcap -d $(INPUT_DEVICE) -c 240
 
 play : out
-	ffplay -hide_banner -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate 10 -i out
+	ffplay -hide_banner -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out

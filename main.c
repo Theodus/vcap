@@ -21,11 +21,11 @@ TODO:
   - Interact with driver
 */
 
-struct buffer
+typedef struct
 {
   void* start;
   size_t length;
-};
+} buf_t;
 
 typedef struct
 {
@@ -35,7 +35,7 @@ typedef struct
 
 static char* dev_name;
 static int fd = -1;
-struct buffer* buffers;
+static buf_t* buffers;
 static size_t n_buffers;
 static int out_buf;
 static int frame_count = 70;
@@ -92,9 +92,8 @@ static void init_mmap()
   if (req.count < buf_count)
     device_err("has insufficient buffer memory");
 
-  buffers = calloc(req.count, sizeof(*buffers));
-
-  if (!buffers)
+  buffers = calloc(req.count, sizeof(buf_t));
+  if (NULL == buffers)
     fatal_err("out of memory");
 
   for (n_buffers = 0; n_buffers < req.count; n_buffers++)
@@ -413,5 +412,6 @@ int main(int argc, char** argv)
   uninit_device();
   close_device();
   fprintf(stderr, "\n");
+
   return 0;
 }
