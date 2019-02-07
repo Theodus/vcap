@@ -4,22 +4,31 @@ TARGET = vcap
 INPUT_DEVICE ?= /dev/video2
 RESOLUTION ?= 640x480
 FRAMERATE ?= 30
+FRAMES ?= 60
 
-.PHONY : all clean out perf play
+.PHONY : all clean out.yuv play play2
 
 all : $(TARGET)
 
 clean :
-	-rm -f $(TARGET) *.o out perf.*
+	-rm -f $(TARGET) *.o *.yuv
 
 $(TARGET) : main.c
 	-$(CC) $(CFLAGS) -o $(TARGET) main.c
 
-out : $(TARGET)
-	./vcap -d $(INPUT_DEVICE) -c 120 -r $(RESOLUTION) -f $(FRAMERATE) -o > out
+out.yuv : $(TARGET)
+	./vcap -d $(INPUT_DEVICE) -c $(FRAMES) -r $(RESOLUTION) -f $(FRAMERATE) -o > out.yuv
 
-perf : $(TARGET)
-	perf record -g ./vcap -d $(INPUT_DEVICE) -c 240
+play : out.yuv
+	ffplay -hide_banner -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out.yuv
 
-play : out
-	ffplay -hide_banner -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out
+# play2 :
+# 	./vcap -d $(INPUT_DEVICE) -c $(FRAMES) -r $(RESOLUTION) -f $(FRAMERATE) -o > out1.yuv
+# 	./vcap -d /dev/video4 -c $(FRAMES) -r $(RESOLUTION) -f $(FRAMERATE) -o > out2.yuv
+# 	# sleep 1
+# 	ffmpeg -y -hide_banner \
+# 		-video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out1.yuv \
+# 		-video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out2.yuv \
+# 		-filter_complex hstack=inputs=2 out.yuv
+
+# 	ffplay -hide_banner -video_size $(RESOLUTION) -pixel_format yuyv422 -f rawvideo -framerate $(FRAMERATE) -i out.yuv

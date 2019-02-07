@@ -15,13 +15,12 @@
 // V4L2 Video capture to hardware driver
 
 /*
-- check `v4l2-ctl --list-formats-ext`, for camera details
+- check `v4l2-ctl -d /dev/video2 --list-formats-ext`, for camera details
 
 TODO:
   - Interact with driver
   - Video Framebuffer API, ScatterGather
   - Buffer to HDMI out through board
-  - 720x640
 */
 
 typedef struct
