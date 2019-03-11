@@ -4,21 +4,23 @@ ELFSIZE += $(CROSS_TARGET).size
 
 CC ?= clang
 
-# TODO: make portable, README
-CROSS_CC_PATH ?= /opt/Xilinx/SDK/2015.4/gnu/arm/lin/bin/
-CROSS_CC ?= $(CROSS_CC_PATH)arm-xilinx-linux-gnueabi-gcc
-CROSS_SIZE ?= $(CROSS_CC_PATH)arm-xilinx-linux-gnueabi-size
+CROSS_TOOLCHAIN_PREFIX ?= /opt/Xilinx/SDK/2015.4/gnu/arm/lin
+CROSS_CC ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-gcc
+CROSS_SIZE ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-size
 
+# TODO: -Wextra
 CFLAGS := \
-	-std=gnu11 -O3 -g -Wall -Wpedantic \
+	-std=gnu11 -O2 -g -Wall -Wpedantic \
 	-fno-omit-frame-pointer
 
 INCLUDES ?=
 
 CROSS_LIBS := -lm -lv4l2 -lv4lconvert
+VENDOR_LIB_PATH ?= ./vendor/zc702_trd_2015_4/
+V4L2_VENDOR_PATH ?=
 CROSS_LIBS_PATH ?= \
-	-L/home/theodus/Documents/rdf0286-zc702-zvik-base-trd-2015-4/software/xsdk/lib \
-	-L/opt/Xilinx/SDK/2015.4/gnu/arm/lin/arm-xilinx-linux-gnueabi/libc/lib
+	-L$(V4L2_VENDOR_PATH) \
+	-L$(CROSS_TOOLCHAIN_PREFIX)/arm-xilinx-linux-gnueabi/libc/lib
 
 SRCS := $(wildcard *.c)
 NATIVE_OBJS := $(patsubst %.c,./build/native/%.o,$(SRCS))
