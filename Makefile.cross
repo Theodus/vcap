@@ -1,0 +1,38 @@
+CROSS_TARGET := vcap.elf
+ELFSIZE += $(CROSS_TARGET).size
+
+RM := rm -f
+
+CROSS_CC_PATH ?= /opt/Xilinx/SDK/2015.4/gnu/arm/lin/bin
+CROSS_CC ?= $(CROSS_CC_PATH)/arm-xilinx-linux-gnueabi-gcc
+CROSS_SIZE ?= $(CROSS_CC_PATH)/arm-xilinx-linux-gnueabi-size
+
+CFLAGS := -std=gnu11 -O0 -g3 -Wall -Wpedantic
+INCLUDES ?= \
+	-I/opt/Xilinx/SDK/2015.4/data/embeddedsw/ThirdParty/opencv/include
+
+LIBS := -lm -lv4l2 -lv4lconvert
+LIBS_PATH ?= \
+	-L/home/theodus/Documents/rdf0286-zc702-zvik-base-trd-2015-4/software/xsdk/lib \
+	-L/opt/Xilinx/SDK/2015.4/gnu/arm/lin/arm-xilinx-linux-gnueabi/libc/lib
+
+SRCS := $(wildcard *.c)
+OBJS := $(patsubst %.c,%.o,$(SRCS))
+
+.PHONY: all clean
+
+default: all
+
+all: $(CROSS_TARGET) $(ELFSIZE)
+
+clean:
+	-$(RM) $(EXECUTABLES) $(OBJS) $(CROSS_TARGET) $(ELFSIZE)
+
+%.o: %.c
+	$(CROSS_CC) $(CFLAGS) $(INCLUDES) -c "$<" -o "$@"
+
+$(CROSS_TARGET): $(OBJS)
+	$(CROSS_CC) $(LIBS_PATH) -o "$(CROSS_TARGET)" $(OBJS) $(LIBS)
+
+$(ELFSIZE): $(CROSS_TARGET)
+	$(CROSS_SIZE) $(CROSS_TARGET) | tee $(ELFSIZE)

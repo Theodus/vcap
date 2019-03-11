@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h> // low-level i/o
+#include <fcntl.h>
 #include <getopt.h>
 #include <linux/videodev2.h>
 #include <stdbool.h>
@@ -14,14 +14,8 @@
 
 // V4L2 Video capture to hardware driver
 
-/*
-- check `v4l2-ctl -d /dev/video2 --list-formats-ext`, for camera details
-
-TODO:
-  - Interact with driver
-  - Video Framebuffer API, ScatterGather
-  - Buffer to HDMI out through board
-*/
+// check `v4l2-ctl -d /dev/video[?] --list-formats-ext` for options supported
+// by camera
 
 typedef struct
 {
