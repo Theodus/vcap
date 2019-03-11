@@ -8,7 +8,7 @@ RESOLUTION ?= 640x480
 FRAMERATE ?= 30
 FRAMES ?= 60
 
-.PHONY : all clean out.yuv play
+.PHONY : all clean play
 
 all : $(TARGET)
 

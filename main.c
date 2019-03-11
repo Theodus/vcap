@@ -29,14 +29,14 @@ typedef struct
   size_t y;
 } resolution_t;
 
-static char* dev_name;
+static char* dev_name = "/dev/video0";
 static int fd = -1;
 static buf_t* buffers;
 static size_t n_buffers;
 static int out_buf;
-static int frame_count = 70;
-static resolution_t resolution = {1280, 720};
-static size_t frame_rate = 10;
+static int frame_count = 60;
+static resolution_t resolution = {640, 480};
+static size_t frame_rate = 30;
 
 static void errno_err(const char* s)
 {
@@ -328,13 +328,14 @@ static void usage(FILE* fp, char const* arg0)
     "-o | --output        Outputs stream to stdout\n"
     "-c | --count         Number of frames to grab [%i]\n"
     "-r | --resolution    Resulution [%zux%zu]\n"
-    "-f | --framerate     Frame rate\n"
+    "-f | --framerate     Frame rate [%zu]\n"
     "\n",
     arg0,
     dev_name,
     frame_count,
     resolution.x,
-    resolution.y);
+    resolution.y,
+    frame_rate);
 }
 
 static char const* short_options = "d:hoc:r:f:";
@@ -350,8 +351,6 @@ static const struct option long_options[] = {
 
 int main(int argc, char** argv)
 {
-  dev_name = "/dev/video0";
-
   while (true)
   {
     int idx;
