@@ -12,11 +12,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// V4L2 Video capture to hardware driver
-
-// check `v4l2-ctl -d /dev/video[?] --list-formats-ext` for options supported
-// by camera
-
 typedef struct
 {
   void* start;

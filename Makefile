@@ -24,19 +24,16 @@ SRCS := $(wildcard *.c)
 NATIVE_OBJS := $(patsubst %.c,./build/native/%.o,$(SRCS))
 CROSS_OBJS := $(patsubst %.c,./build/cross/%.o,$(SRCS))
 
-INPUT_DEVICE ?= /dev/video2
-RESOLUTION ?= 640x480
-FRAMERATE ?= 30
-FRAMES ?= 60
-
-.PHONY: default all clean playback
+.PHONY: default all clean native cross
 
 default: all
 
-all: $(NATIVE_TARGET) $(CROSS_TARGET) $(ELFSIZE)
+all: native cross
 
 clean:
-	-rm -rf ./build $(TARGET) $(CROSS_TARGET) $(ELFSIZE)
+	-rm -rf ./build
+
+native: $(NATIVE_TARGET)
 
 ./build/native/%.o: %.c
 	-mkdir -p ./build/native
@@ -44,6 +41,8 @@ clean:
 
 $(NATIVE_TARGET): $(NATIVE_OBJS)
 	$(CC) -o "$@" "$<"
+
+cross: $(CROSS_TARGET) $(ELFSIZE)
 
 ./build/cross/%.o: %.c
 	-mkdir -p ./build/cross
@@ -54,20 +53,3 @@ $(CROSS_TARGET): $(CROSS_OBJS)
 
 $(ELFSIZE): $(CROSS_TARGET)
 	$(CROSS_SIZE) "$<" | tee "$@"
-
-out.yuv: $(TARGET)
-	./vcap \
-		-d $(INPUT_DEVICE) \
-		-c $(FRAMES) \
-		-r $(RESOLUTION) \
-		-f $(FRAMERATE) -o \
-		> out.yuv
-
-playback: out.yuv
-	ffplay \
-		-hide_banner \
-		-video_size $(RESOLUTION) \
-		-pixel_format yuyv422 \
-		-f rawvideo \
-		-framerate $(FRAMERATE) \
-		-i out.yuv
