@@ -1,6 +1,6 @@
-NATIVE_TARGET := ./build/native/vcap
-CROSS_TARGET := ./build/cross/vcap
-ELFSIZE += $(CROSS_TARGET).size
+native_target := ./build/native/vcap
+cross_target := ./build/cross/vcap
+elfsize += $(cross_target).size
 
 CC ?= clang
 
@@ -9,22 +9,34 @@ CROSS_CC ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-gcc
 CROSS_SIZE ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-size
 
 # TODO: -Wextra
+# CFLAGS := \
+# 	-std=gnu11 -O2 -g -Wall -Wpedantic \
+# 	-fno-omit-frame-pointer
+
 CFLAGS := \
-	-std=gnu11 -O2 -g -Wall -Wpedantic \
+	-std=gnu11 -O2 -g \
 	-fno-omit-frame-pointer
 
-INCLUDES ?=
+LDFLAGS := -ldrm
 
-CROSS_LIBS := -lm -lv4l2 -lv4lconvert
-VENDOR_LIB_PATH ?= ./vendor/zc702_trd_2015_4/
-V4L2_VENDOR_PATH ?=
-CROSS_LIBS_PATH ?= \
-	-L$(V4L2_VENDOR_PATH) \
+# TODO: make portable again, update README
+
+INCLUDES ?= \
+	-I/home/theodus/Documents/xsdk/include \
+	-I/home/theodus/Documents/xsdk/projects/video_lib/include \
+	-I/home/theodus/Documents/xsdk/projects/filter_lib/include \
+	-I/home/theodus/Documents/xsdk/include/libdrm
+
+CROSS_LDFLAGS := -lm -ldrm -lv4l2 -lv4lconvert
+VENDOR_LDPATH ?= /home/theodus/Documents/xsdk/lib
+CROSS_LDFLAGS_PATH ?= \
+	-L$(VENDOR_LDPATH) \
 	-L$(CROSS_TOOLCHAIN_PREFIX)/arm-xilinx-linux-gnueabi/libc/lib
 
-SRCS := $(wildcard *.c)
-NATIVE_OBJS := $(patsubst %.c,./build/native/%.o,$(SRCS))
-CROSS_OBJS := $(patsubst %.c,./build/cross/%.o,$(SRCS))
+srcs = $(wildcard *.c)
+headers = $(wildcard *.h)
+native_obj = $(patsubst %.c,./build/native/%.o,$(srcs))
+cross_obj = $(patsubst %.c,./build/cross/%.o,$(srcs))
 
 .PHONY: default all clean native cross
 
@@ -35,23 +47,23 @@ all: native cross
 clean:
 	-rm -rf ./build
 
-native: $(NATIVE_TARGET)
+native: $(native_target)
 
-./build/native/%.o: %.c
-	-mkdir -p ./build/native
-	$(CC) $(CFLAGS) $(INCLUDES) -o "$@" -c "$<"
+./build/native/%.o: %.c $(headers)
+	@mkdir -p ./build/native
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-$(NATIVE_TARGET): $(NATIVE_OBJS)
-	$(CC) -o "$@" "$<"
+$(native_target): $(native_obj)
+	$(CC) $(LDFLAGS) -o $@ $^
 
-cross: $(CROSS_TARGET) $(ELFSIZE)
+cross: $(cross_target) $(elfsize)
 
-./build/cross/%.o: %.c
-	-mkdir -p ./build/cross
-	$(CROSS_CC) $(CFLAGS) $(INCLUDES) -o "$@" -c "$<"
+./build/cross/%.o: %.c $(headers)
+	@mkdir -p ./build/cross
+	$(CROSS_CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-$(CROSS_TARGET): $(CROSS_OBJS)
-	$(CROSS_CC) $(CROSS_LIBS_PATH) $(CROSS_LIBS) -o "$@" "$<"
+$(cross_target): $(cross_obj)
+	$(CROSS_CC) $(CROSS_LDFLAGS_PATH) $(CROSS_LDFLAGS) -o $@ $^
 
-$(ELFSIZE): $(CROSS_TARGET)
-	$(CROSS_SIZE) "$<" | tee "$@"
+$(elfsize): $(cross_target)
+	$(CROSS_SIZE) $< | tee $@

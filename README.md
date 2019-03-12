@@ -13,7 +13,8 @@ The resulting binary will be written to `./build/native/vcap`.
 
 Specify the cross-compiler toolchain prefix and the path of required libraries such as V4L2 (following example using prefix of libs bundled with xsdk from installed zc702 base TRD)
 ```console
-# VENDOR_LIB_PATH=~/Documents/rdf0286-zc702-zvik-base-trd-2015-4/software/xsdk/lib \
+# VENDOR_LIB_PATH=/home/theodus/Documents/rdf0286-zc702-zvik-base-trd-2015-4/software/xsdk/lib \
+    INCLUDES=-I/home/theodus/Documents/rdf0286-zc702-zvik-base-trd-2015-4/software/xsdk/include \
     CROSS_TOOLCHAIN_PREFIX=/opt/Xilinx/SDK/2015.4/gnu/arm/lin \
     make cross
 ```
