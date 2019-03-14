@@ -16,18 +16,15 @@ CFLAGS := \
 
 LDFLAGS := -ldrm
 
-# TODO: make portable again, update README
+VENDOR_ROOT_PATH ?= $(HOME)/Documents/xsdk
 
 INCLUDES ?= \
-	-I/home/theodus/Documents/xsdk/include \
-	-I/home/theodus/Documents/xsdk/projects/video_lib/include \
-	-I/home/theodus/Documents/xsdk/projects/filter_lib/include \
-	-I/home/theodus/Documents/xsdk/include/libdrm
+	-I$(VENDOR_ROOT_PATH)/include \
+	-I$(VENDOR_ROOT_PATH)/include/libdrm
 
 CROSS_LDFLAGS := -ldrm -lv4l2 -lv4lconvert
-VENDOR_LDPATH ?= /home/theodus/Documents/xsdk/lib
 CROSS_LDFLAGS_PATH ?= \
-	-L$(VENDOR_LDPATH) \
+	-L$(VENDOR_ROOT_PATH)/lib \
 	-L$(CROSS_TOOLCHAIN_PREFIX)/arm-xilinx-linux-gnueabi/libc/lib
 
 srcs = $(wildcard *.c)
