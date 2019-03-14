@@ -239,7 +239,7 @@ static inline bool drm_find_plane(drm_device_t* dev)
   return true;
 }
 
-static bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
+static inline bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
 {
   dev->saved_crtc = drmModeGetCrtc(dev->fd, dev->crtc_id);
   if (!dev->saved_crtc)
@@ -311,4 +311,29 @@ static inline void drm_init(
 
   if (!drm_set_mode(dev, width, height))
     abort_msg("unable set DRM configuration");
+}
+
+static inline void drm_set_plane_state(
+  drm_device_t* dev,
+  unsigned int plane_id,
+  bool enable,
+  size_t width,
+  size_t height)
+{
+  drmModePlanePtr plane = drmModeGetPlane(dev->fd, plane_id);
+  int fb_id = enable ? plane->fb_id : 0;
+  drmModeSetPlane(
+    dev->fd,
+    plane->plane_id,
+    dev->crtc_id,
+    fb_id,
+    0,
+    plane->crtc_x,
+    plane->crtc_y,
+    width,
+    height,
+    plane->x << 16,
+    plane->y << 16,
+    width << 16,
+    height << 16);
 }

@@ -227,17 +227,9 @@ static void stop_capturing()
     abort_errno("VIDIOC_STREAMOFF");
 }
 
-static void process_image(const void* p, int size)
-{
-  if (out_buf)
-    fwrite(p, size, 1, stdout);
+typedef void (*frame_notify_t)(void const*, size_t);
 
-  fflush(stderr);
-  fprintf(stderr, ".");
-  fflush(stdout);
-}
-
-static bool read_frame()
+static bool read_frame(frame_notify_t notify)
 {
   struct v4l2_buffer buf = {
     .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
@@ -258,7 +250,7 @@ static bool read_frame()
 
   assert(buf.index < n_buffers);
 
-  process_image(buffers[buf.index].start, buf.bytesused);
+  notify(buffers[buf.index].start, buf.bytesused);
 
   if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
     abort_errno("VIDIOC_QBUF");
@@ -266,7 +258,7 @@ static bool read_frame()
   return true;
 }
 
-static void mainloop()
+static void mainloop(frame_notify_t notify)
 {
   size_t count = frame_count;
   while (count-- > 0)
@@ -290,12 +282,22 @@ static void mainloop()
       if (0 == r)
         abort_msg("select timeout");
 
-      if (read_frame())
+      if (read_frame(notify))
         break;
 
       // EAGAIN - continue select loop.
     }
   }
+}
+
+static void frame_notify_dump(const void* p, size_t size)
+{
+  if (out_buf)
+    fwrite(p, size, 1, stdout);
+
+  fflush(stderr);
+  fprintf(stderr, ".");
+  fflush(stdout);
 }
 
 static void usage(FILE* fp, char const* arg0)
@@ -332,6 +334,8 @@ static const struct option long_options[] = {
   {"resolution", required_argument, NULL, 'r'},
   {"framerate", required_argument, NULL, 'f'},
   {0, 0, 0, 0}};
+
+// TODO: input device stuff in vcap.h or something
 
 int main(int argc, char** argv)
 {
@@ -391,17 +395,23 @@ int main(int argc, char** argv)
   open_device();
   init_device();
 
+  void (*frame_notify)(void const*, size_t) = frame_notify_dump;
+
   if (drm)
   {
     drm_device_t drm_dev;
     drm_dev.module = "xylon-drm";
     drm_dev.format = V4L2_PIX_FMT_YUYV;
 
-    drm_init(&drm_dev, 4, 640, 480);
+    drm_init(&drm_dev, 4, resolution.x, resolution.y);
+    drm_set_plane_state(
+      &drm_dev, drm_dev.prim_plane.plane_id, false, resolution.x, resolution.y);
+
+    // frame_notify = frame_notify_drm;
   }
 
   start_capturing();
-  mainloop();
+  mainloop(frame_notify);
   stop_capturing();
 
   uninit_device();
