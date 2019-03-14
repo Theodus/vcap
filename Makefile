@@ -9,13 +9,10 @@ CROSS_CC ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-gcc
 CROSS_SIZE ?= $(CROSS_TOOLCHAIN_PREFIX)/bin/arm-xilinx-linux-gnueabi-size
 
 # TODO: -Wextra
-# CFLAGS := \
-# 	-std=gnu11 -O2 -g -Wall -Wpedantic \
-# 	-fno-omit-frame-pointer
-
 CFLAGS := \
-	-std=gnu11 -O2 -g \
-	-fno-omit-frame-pointer
+	-std=gnu11 -O2 \
+	-Wall -Wpedantic \
+	-g -fno-omit-frame-pointer
 
 LDFLAGS := -ldrm
 
@@ -27,7 +24,7 @@ INCLUDES ?= \
 	-I/home/theodus/Documents/xsdk/projects/filter_lib/include \
 	-I/home/theodus/Documents/xsdk/include/libdrm
 
-CROSS_LDFLAGS := -lm -ldrm -lv4l2 -lv4lconvert
+CROSS_LDFLAGS := -ldrm -lv4l2 -lv4lconvert
 VENDOR_LDPATH ?= /home/theodus/Documents/xsdk/lib
 CROSS_LDFLAGS_PATH ?= \
 	-L$(VENDOR_LDPATH) \
