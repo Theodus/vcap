@@ -4,8 +4,11 @@
 
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
+#include <stdbool.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
@@ -45,6 +48,8 @@ typedef struct
   const char modestr[32];
   unsigned int format;
   drm_buf_t drm_bufs[MAX_DRM_BUFS];
+  uint32_t width;
+  uint32_t height;
 } drm_device_t;
 
 // Create dumb scanout buffers and framebuffer
@@ -239,7 +244,7 @@ static inline bool drm_find_plane(drm_device_t* dev)
   return true;
 }
 
-static inline bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
+static inline bool drm_set_mode(drm_device_t* dev)
 {
   dev->saved_crtc = drmModeGetCrtc(dev->fd, dev->crtc_id);
   if (!dev->saved_crtc)
@@ -251,8 +256,8 @@ static inline bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
   for (j = 0; j < connector->count_modes; j++)
   {
     if (
-      connector->modes[j].hdisplay == width &&
-      connector->modes[j].vdisplay == height)
+      connector->modes[j].hdisplay == dev->width &&
+      connector->modes[j].vdisplay == dev->height)
     {
       mode_found = 1;
       break;
@@ -262,7 +267,10 @@ static inline bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
   if (!mode_found)
   {
     fprintf(
-      stderr, "Monitor does not support resolution %zux%zu\n", width, height);
+      stderr,
+      "Monitor does not support resolution %ux%u\n",
+      dev->width,
+      dev->height);
     return false;
   }
 
@@ -282,8 +290,7 @@ static inline bool drm_set_mode(drm_device_t* dev, size_t width, size_t height)
 }
 
 // Allocate framebuffers and map to userland
-static inline void drm_init(
-  drm_device_t* dev, unsigned int num_buffers, size_t width, size_t height)
+static inline void drm_init(drm_device_t* dev, unsigned int num_buffers)
 {
   dev->fd = drmOpen(dev->module, NULL);
   if (dev->fd < 0)
@@ -292,7 +299,7 @@ static inline void drm_init(
   for (size_t i = 0; i < num_buffers; ++i)
   {
     if (!drm_buffer_create(
-          dev, &dev->drm_bufs[i], width, height, XYLON_DRM_STRIDE))
+          dev, &dev->drm_bufs[i], dev->width, dev->height, XYLON_DRM_STRIDE))
       abort_msg("unable to create buffer");
 
     dev->drm_bufs[i].index = i;
@@ -309,16 +316,12 @@ static inline void drm_init(
   if (!drm_find_plane(dev))
     abort_msg("unable to find compatible plane");
 
-  if (!drm_set_mode(dev, width, height))
+  if (!drm_set_mode(dev))
     abort_msg("unable set DRM configuration");
 }
 
-static inline void drm_set_plane_state(
-  drm_device_t* dev,
-  unsigned int plane_id,
-  bool enable,
-  size_t width,
-  size_t height)
+static inline void
+drm_set_plane_state(drm_device_t* dev, unsigned int plane_id, bool enable)
 {
   drmModePlanePtr plane = drmModeGetPlane(dev->fd, plane_id);
   int fb_id = enable ? plane->fb_id : 0;
@@ -330,10 +333,32 @@ static inline void drm_set_plane_state(
     0,
     plane->crtc_x,
     plane->crtc_y,
-    width,
-    height,
+    dev->width,
+    dev->height,
     plane->x << 16,
     plane->y << 16,
-    width << 16,
-    height << 16);
+    dev->width << 16,
+    dev->height << 16);
+}
+
+// Set buffer index for next scanout
+static inline bool drm_set_plane(drm_device_t* dev, uint32_t index)
+{
+  // the CRTC blends the plane over the framebuffer during scanout
+  int ret = drmModeSetPlane(
+    dev->fd,
+    dev->overlay_plane.plane_id,
+    dev->crtc_id,
+    dev->drm_bufs[index].fb_handle,
+    0,
+    0,
+    0,
+    dev->width,
+    dev->height,
+    0,
+    0,
+    dev->width << 16,
+    dev->height << 16);
+
+  return ret == 0;
 }
