@@ -75,25 +75,24 @@ static bool drm_frames(buf_t frame, uint32_t index)
   uint8_t* in = frame.start;
   uint8_t* out = drm_dev.drm_bufs[index].drm_buff;
 
-  // This is not the correct layout. It's bad and I should feel bad.
+  // TODO: This is not the correct layout. It's bad and I should feel bad.
   size_t const w = resolution.x;
   size_t const h = resolution.y;
-  size_t const pad = XYLON_DRM_STRIDE - w * 2;
+  size_t const pad = XYLON_DRM_STRIDE - w;
   for (size_t y = 0; y < h; y++)
   {
     for (size_t x = 0; x < w; x++)
-    {
-      uint8_t b = *in++;
-      *(out + w) = b;
-      *out++ = b;
-    }
-    out += w;
+      *out++ = *in++;
 
     memset(out, 0, pad);
     out += pad;
   }
+  size_t const out_len = drm_dev.drm_bufs[index].dumb_buff_length;
+  size_t const written = out - drm_dev.drm_bufs[index].drm_buff;
+  memset(out, 0, out_len - written);
+  out += (out_len - written);
 
-  assert((w * h) == ((size_t)in - (size_t)frame.start));
+  assert((w * h) == (in - frame.start));
 
   return drm_set_plane(&drm_dev, index);
 }

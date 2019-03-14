@@ -17,7 +17,7 @@
 
 typedef struct
 {
-  void* start;
+  uint8_t* start;
   size_t length;
 } buf_t;
 
