@@ -8,10 +8,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void dump_frames()
+typedef bool (*frame_notify_t)(buf_t, uint32_t);
+
+static void capture_loop(frame_notify_t notify)
 {
+  bool const continuous = (frame_count == 0);
   size_t count = frame_count;
-  while (count-- > 0)
+  while ((count-- > 0) || continuous)
   {
     while (true)
     {
@@ -37,17 +40,24 @@ static void dump_frames()
       if (!read_frame(&frame, &index))
         continue;
 
-      if (out_buf)
-        fwrite(frame.start, frame.length, 1, stdout);
+      if (!notify(frame, index))
+        return;
 
-      fflush(stderr);
-      fprintf(stderr, ".");
-      fflush(stdout);
       break;
-
-      // EAGAIN - continue select loop.
     }
   }
+}
+
+static bool dump_frames(buf_t frame, uint32_t index)
+{
+  if (out_buf)
+    fwrite(frame.start, frame.length, 1, stdout);
+
+  fflush(stderr);
+  fprintf(stderr, ".");
+  fflush(stdout);
+
+  return true;
 }
 
 static drm_device_t drm_dev;
@@ -59,55 +69,32 @@ static void drm_notify_vblank(
   fprintf(stderr, "DRM vblank\n");
 }
 
-// TODO: merge with dump_frames
-static void drm_frames()
+static bool drm_frames(buf_t frame, uint32_t index)
 {
-  drmEventContext evctx;
-  memset(&evctx, 0, sizeof(evctx));
-  evctx.version = DRM_EVENT_CONTEXT_VERSION;
-  evctx.vblank_handler = drm_notify_vblank;
+  uint8_t* in = frame.start;
+  uint8_t* out = drm_dev.drm_bufs[index].drm_buff;
 
-  // TODO: is there a sensible outer loop condition?
-  while (true)
+  // This is not the correct layout. It's bad and I should feel bad.
+  size_t const w = resolution.x;
+  size_t const h = resolution.y;
+  size_t const pad = XYLON_DRM_STRIDE - w * 2;
+  for (size_t y = 0; y < h; y++)
   {
-    while (true)
+    for (size_t x = 0; x < w; x++)
     {
-      fd_set fds;
-      FD_ZERO(&fds);
-      FD_SET(fd, &fds);
-
-      struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
-      int r = select(fd + 1, &fds, NULL, NULL, &tv);
-      if (-1 == r)
-      {
-        if (EINTR == errno)
-          continue;
-
-        abort_errno("select");
-      }
-
-      if (0 == r)
-        abort_msg("select timeout");
-
-      buf_t frame;
-      uint32_t index;
-      if (!read_frame(&frame, &index))
-        continue;
-
-      uint8_t* out = drm_dev.drm_bufs[index].drm_buff;
-      // TODO: correct layout, not a straight memcpy
-      memcpy(out, frame.start, frame.length);
-
-      if (!drm_set_plane(&drm_dev, index))
-        return;
-
-      fflush(stderr);
-      fprintf(stderr, ".");
-      break;
-
-      // EAGAIN - continue select loop.
+      uint8_t b = *in++;
+      *(out + w) = b;
+      *out++ = b;
     }
+    out += w;
+
+    memset(out, 0, pad);
+    out += pad;
   }
+
+  fprintf(stderr, "written: %zu\n", (size_t)in - (size_t)frame.start);
+
+  return drm_set_plane(&drm_dev, index);
 }
 
 static void usage(FILE* fp, char const* arg0)
@@ -121,7 +108,7 @@ static void usage(FILE* fp, char const* arg0)
     "-d | --device        Video device name [%s]\n"
     "-o | --output        Outputs stream to stdout\n"
     "-v | --video         Outputs stream to HDMI\n"
-    "-c | --count         Number of frames to grab [%i]\n"
+    "-c | --count         Number of frames to grab (0 is continuous) [%i]\n"
     "-r | --resolution    Resulution [%ux%u]\n"
     "-f | --framerate     Frame rate [%zu]\n"
     "\n",
@@ -203,6 +190,8 @@ int main(int argc, char** argv)
   open_device();
   init_device();
 
+  bool (*frame_notify)(buf_t, uint32_t) = dump_frames;
+
   if (drm)
   {
     drm_dev.width = resolution.x;
@@ -212,15 +201,17 @@ int main(int argc, char** argv)
 
     drm_init(&drm_dev, 4);
     drm_set_plane_state(&drm_dev, drm_dev.prim_plane.plane_id, false);
+
+    drmEventContext evctx;
+    memset(&evctx, 0, sizeof(evctx));
+    evctx.version = DRM_EVENT_CONTEXT_VERSION;
+    evctx.vblank_handler = drm_notify_vblank;
+
+    frame_notify = drm_frames;
   }
 
   start_capturing();
-
-  if (drm)
-    drm_frames();
-  else
-    dump_frames();
-
+  capture_loop(frame_notify);
   stop_capturing();
 
   uninit_device();

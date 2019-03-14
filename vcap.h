@@ -27,12 +27,13 @@ typedef struct
   uint32_t y;
 } resolution_t;
 
+// TODO: proper config struct
 static char* dev_name = "/dev/video7";
 static int fd = -1;
 static buf_t* buffers;
 static uint32_t n_buffers;
 static int out_buf;
-static int frame_count = 60;
+static int frame_count = 120;
 static resolution_t resolution = {640, 480};
 static size_t frame_rate = 30;
 
