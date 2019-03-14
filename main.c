@@ -2,6 +2,7 @@
 #include "errors.h"
 #include "vcap.h"
 
+#include <assert.h>
 #include <getopt.h>
 #include <poll.h>
 #include <stdbool.h>
@@ -92,7 +93,7 @@ static bool drm_frames(buf_t frame, uint32_t index)
     out += pad;
   }
 
-  fprintf(stderr, "written: %zu\n", (size_t)in - (size_t)frame.start);
+  assert((w * h) == ((size_t)in - (size_t)frame.start));
 
   return drm_set_plane(&drm_dev, index);
 }

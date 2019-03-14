@@ -34,7 +34,7 @@ Choose the flags for vcap from the set of supported options for your device (fol
 ### Dump Video to File
 
 Invoke vcap using the options that you have chosen for your device, dumping the yuyv422 video to file
-```
+```console
 # ./vcap -d /dev/video7 -c 120 -r 640x480 -f 30 -o > out.yuv
 ```
 Read the output of `./vcap -h` for more information on the options.
@@ -44,6 +44,16 @@ The shell script `playback.sh` may be used to play the resulting video using `ff
 # ./playback.sh out.yuv 30 640x480
 ```
 
-### Output to HDMI
+### Output to HDMI on zc702 board
 
-TODO
+Copy the cross-compiled binary to the `bin` directory of the SD card image containing the TRD. Then, eject the SD card from the development machine and use it to boot the zc702 board.
+
+Open a serial terminal to the board and login (serial port may vary)
+```console
+screen /dev/ttyUSB0 115200
+```
+
+Run `vcap` with arguments to continuously write to HDMI.
+```
+# /media/card/bin/vcap -d /dev/video7 -c 0 -r 640x480 -f 30 -v
+```
